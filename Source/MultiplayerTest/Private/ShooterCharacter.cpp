@@ -4,6 +4,7 @@
 #include "ShooterCharacter.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "GameFramework/PawnMovementComponent.h"
 
 AShooterCharacter::AShooterCharacter()
 {
@@ -15,6 +16,9 @@ AShooterCharacter::AShooterCharacter()
 
 	CameraComp = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComp"));
 	CameraComp->SetupAttachment(SpringArmComp);
+
+	// enable support for crouching
+	GetMovementComponent()->GetNavAgentPropertiesRef().bCanCrouch = true;
 }
 
 void AShooterCharacter::BeginPlay()
@@ -34,6 +38,16 @@ void AShooterCharacter::MoveRight(float Amount)
 
 }
 
+void AShooterCharacter::BeginCrouch()
+{
+	Crouch();
+}
+
+void AShooterCharacter::EndCrouch()
+{
+	UnCrouch();
+}
+
 void AShooterCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -49,5 +63,10 @@ void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 
 	PlayerInputComponent->BindAxis("LookUp", this, &AShooterCharacter::AddControllerPitchInput);
 	PlayerInputComponent->BindAxis("Turn", this, &AShooterCharacter::AddControllerYawInput);
+
+	PlayerInputComponent->BindAction("Crouch", IE_Pressed, this, &AShooterCharacter::BeginCrouch);
+	PlayerInputComponent->BindAction("Crouch", IE_Released, this, &AShooterCharacter::EndCrouch);
+
+	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
 }
 
