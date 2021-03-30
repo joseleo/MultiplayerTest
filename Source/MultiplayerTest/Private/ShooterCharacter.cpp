@@ -70,3 +70,15 @@ void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
 }
 
+FVector AShooterCharacter::GetPawnViewLocation() const
+{
+	// If the camera comp is valid we return its location instead of the default location (see GetPawnViewLocation)
+	if (CameraComp)
+	{
+		return CameraComp->GetComponentLocation();
+	}
+
+	// ...if fails call the original implementation
+	return Super::GetPawnViewLocation();
+}
+
