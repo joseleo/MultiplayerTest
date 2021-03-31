@@ -5,21 +5,28 @@
 #include "DrawDebugHelpers.h"
 #include "Kismet/GameplayStatics.h"
 #include "Particles/ParticleSystem.h"
+#include "TimerManager.h"
+
+static int32 DebugLineTrace = 0;
+FAutoConsoleVariableRef CVARDebugLineDrawing (
+	TEXT("MULTI.DebugLineTrace"), DebugLineTrace, 
+	TEXT("Draw Debug Lines"), ECVF_Cheat);
 
 AWeapon::AWeapon()
 {
-	PrimaryActorTick.bCanEverTick = true;
-
 	MeshComp = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("MeshComp"));
 	RootComponent = MeshComp;
 
 	MuzzleSocketName = "MuzzleSocket";
+
+	FireRate = 300;		// Amount of bullets per min
 }
 
 void AWeapon::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
+	TimeBtwShots = 60 / FireRate;
 }
 
 void AWeapon::Fire()
@@ -41,35 +48,43 @@ void AWeapon::Fire()
 
 		FCollisionQueryParams QueryParams;
 		QueryParams.AddIgnoredActor(TheOwner);
-		QueryParams.AddIgnoredActor(this);		// ignore the weapon
-		QueryParams.bTraceComplex = true;		// it will trace against each individual triangle of the mesh we're hitting for an exact result
+		QueryParams.AddIgnoredActor(this);		// Ignore the weapon
+		QueryParams.bTraceComplex = true;		// It will trace against each individual triangle of the mesh we're hitting for an exact result
 
 		FHitResult Hit;
-		if (GetWorld()->LineTraceSingleByChannel(Hit, EyeLocation, TraceEnd, ECC_Visibility, QueryParams))
+		if (GetWorld()->LineTraceSingleByChannel(Hit, EyeLocation, TraceEnd, ECC_GameTraceChannel1, QueryParams))
 		{
 			AActor* HitActor = Hit.GetActor();
 
 			UGameplayStatics::ApplyPointDamage(HitActor, 20.0f, ShotDirection, Hit, TheOwner->GetInstigatorController(), this, DamageType);
 
-			if (ImpactFX)
-			{
-				UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactFX, Hit.ImpactPoint, Hit.ImpactNormal.Rotation());
-			}
+			if (ImpactFX) UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactFX, Hit.ImpactPoint, Hit.ImpactNormal.Rotation());
 		}
 
-		DrawDebugLine(GetWorld(), EyeLocation, TraceEnd, FColor::White, false, 0.1f, 0, 0.2f);
+		if (DebugLineTrace) DrawDebugLine(GetWorld(), EyeLocation, TraceEnd, FColor::White, false, 0.1f, 0, 0.2f);
 
-		if (MuzzleFX)
+		if (MuzzleFX) UGameplayStatics::SpawnEmitterAttached(MuzzleFX, MeshComp, MuzzleSocketName);
+
+		APawn* ThePawn = Cast<APawn>(GetOwner());
+		if (ThePawn)
 		{
-			UGameplayStatics::SpawnEmitterAttached(MuzzleFX, MeshComp, MuzzleSocketName);
+			APlayerController* PC = Cast<APlayerController>(ThePawn->GetController());
+			if (PC) PC->ClientStartCameraShake(CamShake);
 		}
+		// Keep track of the time in the world when fire
+		LastShotTime = GetWorld()->TimeSeconds;
 	}
-
 }
 
-void AWeapon::Tick(float DeltaTime)
+void AWeapon::StartFire()
 {
-	Super::Tick(DeltaTime);
+	// Any negative value for FirstDelay would be replace by zero
+	float FirstDelay = FMath::Max(LastShotTime + TimeBtwShots - GetWorld()->TimeSeconds, 0.0f);
 
+	GetWorldTimerManager().SetTimer(TimeBtwShotsTimer, this, &AWeapon::Fire, TimeBtwShots, true, FirstDelay);
 }
 
+void AWeapon::StopFire()
+{
+	GetWorldTimerManager().ClearTimer(TimeBtwShotsTimer);
+}

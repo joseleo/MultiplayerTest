@@ -8,6 +8,7 @@
 
 class UCameraComponent;
 class USpringArmComponent;
+class AWeapon;
 
 UCLASS()
 class MULTIPLAYERTEST_API AShooterCharacter : public ACharacter
@@ -26,11 +27,33 @@ protected:
 	void BeginCrouch();
 	void EndCrouch();
 
+	void BeginZoom();
+	void EndZoom();
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UCameraComponent* CameraComp;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	USpringArmComponent* SpringArmComp;
+
+	AWeapon* CurrentWeapon;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Player")
+	TSubclassOf<AWeapon> BeginnerWeaponClass;
+
+	UPROPERTY(VisibleDefaultsOnly, Category = "Player")
+	FName WeaponAttachSocketName;
+
+	// Interpolation speed for weapon zoom
+	UPROPERTY(EditDefaultsOnly, Category = "Player", meta = (ClampMin = 1, ClampMax = 100))
+	float InterpSpeed;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Player")
+	float ZoomFOV;
+
+	float DefaultFOV;	// FOV set begin play
+
+	bool bZoomActivated;
 
 public:	
 	virtual void Tick(float DeltaTime) override;
@@ -40,4 +63,9 @@ public:
 
 	virtual FVector GetPawnViewLocation() const override;
 
+	UFUNCTION(BlueprintCallable, Category = "Player")
+	void StartFire();
+
+	UFUNCTION(BlueprintCallable, Category = "Player")
+	void StopFire();
 };

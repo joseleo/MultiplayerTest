@@ -15,12 +15,10 @@ class MULTIPLAYERTEST_API AWeapon : public AActor
 {
 	GENERATED_BODY()
 	
-public:	
-	// Sets default values for this actor's properties
+public:
 	AWeapon();
 
 protected:
-	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -29,7 +27,7 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void Fire();
 
-	// only need to edit in the editor, not runtime, 
+	// Only need to edit in the editor, not runtime, 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	TSubclassOf<UDamageType> DamageType;
 
@@ -42,8 +40,20 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	UParticleSystem* ImpactFX;
 
-public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+	/* IMPORTANT: if using 4.26 DO NOT FORGET to correct TSubclassOf<UCameraShake>
+	with TSubclassOf<UMatineeCameraShake> */
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	TSubclassOf<UMatineeCameraShake> CamShake;
 
+	// Handling time between consecutive shots
+	FTimerHandle TimeBtwShotsTimer;
+	float LastShotTime;
+	float TimeBtwShots;		// Derives from FireRate
+
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	float FireRate;
+
+public:
+	void StartFire();
+	void StopFire();
 };
