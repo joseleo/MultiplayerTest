@@ -6,10 +6,11 @@
 #include "Kismet/GameplayStatics.h"
 #include "Particles/ParticleSystem.h"
 #include "TimerManager.h"
+#include "Net/UnrealNetwork.h"
 
 static int32 DebugLineTrace = 0;
-FAutoConsoleVariableRef CVARDebugLineDrawing (
-	TEXT("MULTI.DebugLineTrace"), DebugLineTrace, 
+FAutoConsoleVariableRef CVARDebugLineDrawing(
+	TEXT("MULTI.DebugLineTrace"), DebugLineTrace,
 	TEXT("Draw Debug Lines"), ECVF_Cheat);
 
 AWeapon::AWeapon()
@@ -19,7 +20,13 @@ AWeapon::AWeapon()
 
 	MuzzleSocketName = "MuzzleSocket";
 
-	FireRate = 300;		// Amount of bullets per min
+	StandardDamage = 20.0f;
+	FireRate = 300.0f;		// Amount of bullets per min
+
+	SetReplicates(true);
+
+	NetUpdateFrequency = 60.0f;
+	MinNetUpdateFrequency = NetUpdateFrequency / 2;
 }
 
 void AWeapon::BeginPlay()
@@ -31,6 +38,8 @@ void AWeapon::BeginPlay()
 
 void AWeapon::Fire()
 {
+	if (!HasAuthority()) ServerFire();
+
 	// Ray from pawn eyes to crosshair
 	AActor* TheOwner = GetOwner();
 
@@ -56,24 +65,40 @@ void AWeapon::Fire()
 		{
 			AActor* HitActor = Hit.GetActor();
 
-			UGameplayStatics::ApplyPointDamage(HitActor, 20.0f, ShotDirection, Hit, TheOwner->GetInstigatorController(), this, DamageType);
+			UGameplayStatics::ApplyPointDamage(HitActor, StandardDamage, ShotDirection, Hit, TheOwner->GetInstigatorController(), this, DamageType);
 
-			if (ImpactFX) UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactFX, Hit.ImpactPoint, Hit.ImpactNormal.Rotation());
+			PlayImpactEffects(Hit.ImpactPoint);
 		}
 
 		if (DebugLineTrace) DrawDebugLine(GetWorld(), EyeLocation, TraceEnd, FColor::White, false, 0.1f, 0, 0.2f);
 
-		if (MuzzleFX) UGameplayStatics::SpawnEmitterAttached(MuzzleFX, MeshComp, MuzzleSocketName);
+		PlayFireEffects(Hit.ImpactPoint);
 
-		APawn* ThePawn = Cast<APawn>(GetOwner());
-		if (ThePawn)
+		if (HasAuthority())
 		{
-			APlayerController* PC = Cast<APlayerController>(ThePawn->GetController());
-			if (PC) PC->ClientStartCameraShake(CamShake);
+			HitScanTrace.TraceTo = Hit.ImpactPoint;
 		}
+
 		// Keep track of the time in the world when fire
 		LastShotTime = GetWorld()->TimeSeconds;
 	}
+}
+
+void AWeapon::ServerFire_Implementation()
+{
+	Fire();
+}
+
+bool AWeapon::ServerFire_Validate()
+{
+	return true;
+}
+
+void AWeapon::OnRep_HitScanTrace()
+{
+	PlayFireEffects(HitScanTrace.TraceTo);
+
+	PlayImpactEffects(HitScanTrace.TraceTo);
 }
 
 void AWeapon::StartFire()
@@ -87,4 +112,34 @@ void AWeapon::StartFire()
 void AWeapon::StopFire()
 {
 	GetWorldTimerManager().ClearTimer(TimeBtwShotsTimer);
+}
+
+void AWeapon::PlayFireEffects(FVector TraceEnd)
+{
+	if (MuzzleFX) UGameplayStatics::SpawnEmitterAttached(MuzzleFX, MeshComp, MuzzleSocketName);
+
+	APawn* ThePawn = Cast<APawn>(GetOwner());
+	if (ThePawn)
+	{
+		APlayerController* PC = Cast<APlayerController>(ThePawn->GetController());
+		if (PC) PC->ClientStartCameraShake(CamShake);
+	}
+}
+
+void AWeapon::PlayImpactEffects(FVector ImpactPoint)
+{
+	FVector MuzzleLocation = MeshComp->GetSocketLocation(MuzzleSocketName);
+	FVector ShotDirection = ImpactPoint - MuzzleLocation;
+	ShotDirection.Normalize();
+
+	if (ImpactFX) UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactFX, ImpactPoint, ShotDirection.Rotation());
+}
+
+// In this case we don't need  to specify this is the header file
+// it's already done by UE header tool
+void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME_CONDITION(AWeapon, HitScanTrace, COND_SkipOwner);
 }

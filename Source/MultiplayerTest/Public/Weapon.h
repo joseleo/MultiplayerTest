@@ -10,11 +10,22 @@ class USkeletalMeshComponent;
 class UDamageType;
 class UParticleSystem;
 
+USTRUCT()
+struct FHitScanTrace
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY()
+	FVector_NetQuantize TraceTo;
+};
+
+
 UCLASS()
 class MULTIPLAYERTEST_API AWeapon : public AActor
 {
 	GENERATED_BODY()
-	
+
 public:
 	AWeapon();
 
@@ -26,6 +37,13 @@ protected:
 
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void Fire();
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerFire();
+
+	void PlayFireEffects(FVector TraceEnd);
+
+	void PlayImpactEffects(FVector ImpactPoint);
 
 	// Only need to edit in the editor, not runtime, 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
@@ -40,8 +58,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	UParticleSystem* ImpactFX;
 
-	/* IMPORTANT: if using 4.26 DO NOT FORGET to correct TSubclassOf<UCameraShake>
-	with TSubclassOf<UMatineeCameraShake> */
+	/* IMPORTANT: if using 4.26 DO NOT FORGET to correct 
+	TSubclassOf<UCameraShake> with TSubclassOf<UMatineeCameraShake> */
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
 	TSubclassOf<UMatineeCameraShake> CamShake;
 
@@ -53,7 +71,17 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
 	float FireRate;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	float StandardDamage;
+
+	UPROPERTY(ReplicatedUsing=OnRep_HitScanTrace)
+	FHitScanTrace HitScanTrace;
+
+	UFUNCTION()
+	void OnRep_HitScanTrace();
+
 public:
 	void StartFire();
+
 	void StopFire();
 };
