@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Written by Jose Leon on March 2021.
 
 #pragma once
 

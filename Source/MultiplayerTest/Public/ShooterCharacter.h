@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Written by Jose Leon on March 2021.
 
 #pragma once
 
@@ -9,6 +9,7 @@
 class UCameraComponent;
 class USpringArmComponent;
 class AWeapon;
+class UHealthComponent;
 
 UCLASS()
 class MULTIPLAYERTEST_API AShooterCharacter : public ACharacter
@@ -36,6 +37,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	USpringArmComponent* SpringArmComp;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UHealthComponent* HealthComp;
+
 	AWeapon* CurrentWeapon;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Player")
@@ -54,6 +58,12 @@ protected:
 	float DefaultFOV;	// FOV set begin play
 
 	bool bZoomActivated;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Player")
+	bool bDied;
+
+	UFUNCTION()
+	void OnHealthChanged(UHealthComponent* OwningHealthComp, float Health, float HealthDelta, const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser);
 
 public:	
 	virtual void Tick(float DeltaTime) override;

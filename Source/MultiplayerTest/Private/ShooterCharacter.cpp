@@ -1,11 +1,13 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Written by Jose Leon on March 2021.
 
 
 #include "ShooterCharacter.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/PawnMovementComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Weapon.h"
+#include "Components/HealthComponent.h"
 
 AShooterCharacter::AShooterCharacter()
 {
@@ -18,8 +20,14 @@ AShooterCharacter::AShooterCharacter()
 	CameraComp = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComp"));
 	CameraComp->SetupAttachment(SpringArmComp);
 
+	HealthComp = CreateDefaultSubobject<UHealthComponent>(TEXT("HealthComp"));
+
 	// Enable support for crouching
 	GetMovementComponent()->GetNavAgentPropertiesRef().bCanCrouch = true;
+
+	// Don't want that capsule block the weapon trace, only mesh should block
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Ignore);
+
 
 	WeaponAttachSocketName = "WeaponSocket";
 
@@ -43,6 +51,8 @@ void AShooterCharacter::BeginPlay()
 		CurrentWeapon->SetOwner(this);
 		CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, WeaponAttachSocketName);
 	}
+
+	HealthComp->OnHealthChanged.AddDynamic(this, &AShooterCharacter::OnHealthChanged);
 }
 
 void AShooterCharacter::MoveForward(float Amount)
@@ -128,4 +138,20 @@ void AShooterCharacter::StartFire()
 void AShooterCharacter::StopFire()
 {
 	if (CurrentWeapon) CurrentWeapon->StopFire();
+}
+
+void AShooterCharacter::OnHealthChanged(UHealthComponent* OwningHealthComp, float Health, float HealthDelta, const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser)
+{
+	if (Health <= 0.0f && !bDied)
+	{
+		// Character is dead
+		bDied = true;
+
+		GetMovementComponent()->StopMovementImmediately();
+		GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+		DetachFromControllerPendingDestroy();
+		// After 5s this whole pawn will get destroyed
+		SetLifeSpan(5.0f);
+	}
 }
